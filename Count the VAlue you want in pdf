@@ -1,0 +1,57 @@
+!pip install pdfplumber pandas
+
+import pdfplumber
+import pandas as pd
+
+def universal_pdf_counter(pdf_path, column_name=None, search_value=None):
+    total_count = 0
+    table_found = False
+
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+
+            # ===============================
+            # 1️⃣ Try Table Extraction
+            # ===============================
+            tables = page.extract_tables()
+
+            for table in tables:
+                if table and len(table) > 1:
+                    df = pd.DataFrame(table[1:], columns=table[0])
+                    df.columns = df.columns.astype(str).str.strip()
+
+                    if column_name and search_value:
+                        matched_cols = [col for col in df.columns 
+                                        if col.lower() == column_name.lower()]
+                        
+                        if matched_cols:
+                            table_found = True
+                            col = matched_cols[0]
+                            df[col] = df[col].astype(str).str.strip()
+
+                            total_count += df[col].str.contains(
+                                search_value, case=False, na=False
+                            ).sum()
+
+            # ===============================
+            # 2️⃣ Fallback to Text Search
+            # ===============================
+            if not table_found and search_value:
+                text = page.extract_text()
+                if text:
+                    total_count += text.count(search_value)
+
+    return total_count
+
+
+# =========================================
+# 🔹 USE HERE
+# =========================================
+
+pdf_path = r"Pdf_location"
+column_name = "Name"          # Optional
+search_value = "Search value"     # What you want to count
+
+result = universal_pdf_counter(pdf_path, column_name, search_value)
+
+print(f"Total occurrences of '{search_value}':", result)
